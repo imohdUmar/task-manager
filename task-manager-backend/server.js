@@ -17,6 +17,9 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.log(err))
 
+app.get('/',(req,res)=>{
+  res.send('server running successfully')
+})
 app.use('/api/users', userRoutes)
 app.use('/api/tasks', taskRoutes)
 

@@ -1,131 +1,247 @@
-import { useEffect, useState } from "react"
-import Modal from "../components/Modal"
-import axios from "axios"
-import TaskCard from "../components/TaskCard"
-import { useNavigate } from "react-router-dom"
-import StatusDropdown from "../components/StatusDropdown"
-import SearchBar from "../components/SearchBar"
-import SortDropdown from "../components/SortDropdown"
+import React, { useEffect, useState } from 'react';
+import { useAppContext } from '../context/AppContext';
+import toast from 'react-hot-toast';
 
 const Dashboard = () => {
-  const [tasks, setTasks] = useState([])
-  const [filter, setFilter] = useState("all")
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [taskToDelete, setTaskToDelete] = useState(null)
-  const [query, setQuery] = useState("")
-  const [sortOrder, setSortOrder] = useState("none")
+  const { axios } = useAppContext();
 
-  const navigate = useNavigate()
+  const [tasks, setTasks] = useState([]);
+  const [taskInput, setTaskInput] = useState({ title: '', description: '' });
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editInput, setEditInput] = useState({ title: '', description: '' });
 
-  // Fetch tasks
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState('latest');
+
   const fetchTasks = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/tasks")
-      setTasks(res.data)
-    } catch (err) {
-      console.error(err)
+      const res = await axios.get('/api/tasks');
+      setTasks(res.data);
+    } catch (error) {
+      toast.error('Failed to load tasks');
     }
-  }
-
-  const deleteTask = (task) => {
-    setTaskToDelete(task)
-    setIsDeleteOpen(true)
-  }
-
-  const confirmDeleteTask = async () => {
-    if (!taskToDelete) return
-    try {
-      await axios.delete(`http://localhost:5000/api/tasks/${taskToDelete._id}`)
-      fetchTasks()
-      setIsDeleteOpen(false)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  const editTask = (task) => {
-    navigate(`/edit-task/${task._id}`)
-  }
+  };
 
   useEffect(() => {
-    fetchTasks()
-  }, [])
+    fetchTasks();
+  }, []);
 
-  // Search + Filter
-  const filteredTasks = tasks.filter(task => {
-    const matchesStatus = filter === "all" ? true : task.status === filter
-    const matchesQuery = task.title.toLowerCase().includes(query.toLowerCase()) ||
-      task.description.toLowerCase().includes(query.toLowerCase())
-    return matchesStatus && matchesQuery
-  })
+  const handleChange = (e) => {
+    setTaskInput(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
-  // Sort by Due Date
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
-    if (sortOrder === "asc") {
-      return new Date(a.dueDate) - new Date(b.dueDate)
-    } else if (sortOrder === "desc") {
-      return new Date(b.dueDate) - new Date(a.dueDate)
-    } else {
-      return 0
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.post('/api/tasks', taskInput);
+      toast.success('Task added');
+      setTaskInput({ title: '', description: '' });
+      setTasks(prev => [res.data, ...prev]);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to add task');
     }
-  })
+  };
+
+  const handleDelete = async (taskId) => {
+    if (!window.confirm('Delete this task?')) return;
+    try {
+      await axios.delete(`/api/tasks/${taskId}`);
+      setTasks(prev => prev.filter(task => task._id !== taskId));
+      toast.success('Task deleted');
+    } catch (error) {
+      toast.error('Failed to delete');
+    }
+  };
+
+  const startEditing = (task) => {
+    setEditingTaskId(task._id);
+    setEditInput({ title: task.title, description: task.description });
+  };
+
+  const handleEditChange = (e) => {
+    setEditInput(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const saveEdit = async () => {
+    try {
+      const res = await axios.put(`/api/tasks/${editingTaskId}`, editInput);
+      setTasks(prev =>
+        prev.map(task => task._id === editingTaskId ? res.data : task)
+      );
+      setEditingTaskId(null);
+      toast.success('Task updated');
+    } catch (error) {
+      toast.error('Failed to update task');
+    }
+  };
+
+  const markCompleted = async (taskId) => {
+    try {
+      const res = await axios.put(`/api/tasks/${taskId}`, { status: 'completed' });
+      setTasks(prev =>
+        prev.map(task => task._id === taskId ? res.data : task)
+      );
+      toast.success('Marked as completed');
+    } catch (error) {
+      toast.error('Failed to mark completed');
+    }
+  };
+
+  const filteredTasks = tasks
+    .filter(task => {
+      if (statusFilter === 'completed') return task.status === 'completed';
+      if (statusFilter === 'pending') return task.status !== 'completed';
+      return true;
+    })
+    .filter(task => {
+      const query = searchQuery.toLowerCase();
+      return (
+        task.title.toLowerCase().includes(query) ||
+        task.description.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      return sortOrder === 'latest'
+        ? new Date(b.createdAt) - new Date(a.createdAt)
+        : new Date(a.createdAt) - new Date(b.createdAt);
+    });
 
   return (
-    <div className="max-w-5xl mx-auto py-8">
-      <div className="flex flex-wrap gap-4 items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Your Tasks</h1>
+    <div className="max-w-2xl mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Your Tasks</h1>
 
-        <div className="flex items-center gap-3">
-          <SearchBar query={query} setQuery={setQuery} />
+      {/* Filters */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:items-center">
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="p-2 border rounded"
+        >
+          <option value="all">All</option>
+          <option value="pending">Pending</option>
+          <option value="completed">Completed</option>
+        </select>
 
-          {/* Sort Dropdown */}
-           <div className="relative inline-block w-52">
-                <SortDropdown sortOrder={sortOrder} setSortOrder={setSortOrder} />
-            </div>
+        <input
+          type="text"
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="p-2 border rounded flex-1"
+        />
 
-          {/* Status Filter Dropdown */}
-          <div className="relative inline-block w-52">
-            <StatusDropdown filter={filter} setFilter={setFilter} />
-          </div>
-        </div>
+        <select
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value)}
+          className="p-2 border rounded"
+        >
+          <option value="latest">Latest</option>
+          <option value="oldest">Oldest</option>
+        </select>
       </div>
 
-      {sortedTasks.length === 0 ? (
-        <p className="text-gray-600">No tasks found.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedTasks.map(task => (
-            <TaskCard
-              key={task._id}
-              task={task}
-              onDelete={deleteTask}
-              onEdit={editTask}
-            />
-          ))}
-        </div>
-      )}
+      {/* Add Task Form */}
+      <form onSubmit={handleSubmit} className="mb-6 bg-white p-4 rounded shadow">
+        <input
+          type="text"
+          name="title"
+          placeholder="Title"
+          value={taskInput.title}
+          onChange={handleChange}
+          required
+          className="w-full mb-3 p-2 border rounded"
+        />
+        <textarea
+          name="description"
+          placeholder="Description"
+          value={taskInput.description}
+          onChange={handleChange}
+          className="w-full mb-3 p-2 border rounded"
+        />
+        <button
+          type="submit"
+          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+        >
+          Add Task
+        </button>
+      </form>
 
-      {/* Delete Confirmation Modal */}
-      <Modal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)}>
-        <h2 className="text-xl font-bold mb-4">Confirm Delete</h2>
-        <p className="text-gray-600 mb-6">Are you sure you want to delete this task?</p>
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={() => setIsDeleteOpen(false)}
-            className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 text-gray-800"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={confirmDeleteTask}
-            className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
-          >
-            Delete
-          </button>
-        </div>
-      </Modal>
+      {/* Show Tasks */}
+      <div className="space-y-4">
+        {filteredTasks.map(task => (
+          <div key={task._id} className="bg-white p-4 rounded shadow">
+            {editingTaskId === task._id ? (
+              <>
+                <input
+                  type="text"
+                  name="title"
+                  value={editInput.title}
+                  onChange={handleEditChange}
+                  className="w-full mb-2 p-2 border rounded"
+                />
+                <textarea
+                  name="description"
+                  value={editInput.description}
+                  onChange={handleEditChange}
+                  className="w-full mb-2 p-2 border rounded"
+                />
+                <button
+                  onClick={saveEdit}
+                  className="mr-2 text-sm bg-green-500 text-white px-3 py-1 rounded"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingTaskId(null)}
+                  className="text-sm text-gray-600 hover:underline"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <h2 className={`font-semibold ${task.status === 'completed' ? 'line-through text-gray-500' : ''}`}>
+                    {task.title}
+                  </h2>
+                  {task.status !== 'completed' && (
+                    <button
+                      onClick={() => markCompleted(task._id)}
+                      className="text-xs bg-green-100 px-2 py-1 rounded text-green-800"
+                    >
+                      Mark Done
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-gray-700">{task.description}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Created: {new Date(task.createdAt).toLocaleString()}
+                </p>
+                <div className="mt-2 flex gap-3 text-sm">
+                  <button
+                    onClick={() => startEditing(task)}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(task._id)}
+                    className="text-red-500 hover:underline"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        {filteredTasks.length === 0 && (
+          <p className="text-center text-gray-500">No tasks found</p>
+        )}
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default Dashboard
+export default Dashboard;

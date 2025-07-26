@@ -1,36 +1,65 @@
-import { Link } from "react-router-dom"
-import { useState } from "react"
-import { Menu, X } from "lucide-react"
+// src/components/Navbar.jsx
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
+import toast from 'react-hot-toast';
 
-function Navbar() {
-  const [open, setOpen] = useState(false)
+const Navbar = () => {
+  const { user, setUser, setToken } = useAppContext();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    setToken(null);
+    toast.success('Logged out successfully');
+    navigate('/login');
+  };
 
   return (
-    <nav className="bg-blue-600 text-white px-4 py-3 shadow-sm">
-      <div className="max-w-6xl mx-auto flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Task Manager</h1>
+    <nav className="bg-blue-600 text-white px-6 py-4 shadow-md">
+      <div className="max-w-7xl mx-auto flex justify-between items-center">
+        <Link to="/" className="text-2xl font-bold">
+          Task Manager
+        </Link>
 
-        {/* Desktop Links */}
-        <div className="hidden md:flex space-x-6">
-          <Link to="/" className="hover:text-gray-300">Dashboard</Link>
-          <Link to="/add-task" className="hover:text-gray-300">Add Task</Link>
+        <div className="flex items-center space-x-4">
+          {user ? (
+            <>
+              <span className="hidden sm:block">Hello, {user.name}</span>
+              <Link
+                to="/"
+                className="hover:underline"
+              >
+                Dashboard
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="bg-white text-blue-600 px-3 py-1 rounded hover:bg-gray-100 transition"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="bg-white text-blue-600 px-3 py-1 rounded hover:bg-gray-100 transition"
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className="bg-white text-blue-600 px-3 py-1 rounded hover:bg-gray-100 transition"
+              >
+                Register
+              </Link>
+            </>
+          )}
         </div>
-
-        {/* Mobile Menu Icon */}
-        <button onClick={() => setOpen(!open)} className="md:hidden">
-          {open ? <X size={26} /> : <Menu size={26} />}
-        </button>
       </div>
-
-      {/* Mobile Links */}
-      {open && (
-        <div className="md:hidden flex flex-col mt-3 space-y-3 px-2 pb-3">
-          <Link onClick={() => setOpen(false)} to="/" className="hover:text-gray-300">Dashboard</Link>
-          <Link onClick={() => setOpen(false)} to="/add-task" className="hover:text-gray-300">Add Task</Link>
-        </div>
-      )}
     </nav>
-  )
-}
+  );
+};
 
-export default Navbar
+export default Navbar;

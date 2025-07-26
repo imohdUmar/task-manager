@@ -1,27 +1,33 @@
-import { Routes, Route } from "react-router-dom"
-import Navbar from "./components/Navbar"
-import './App.css'
-import EditTask from "./pages/EditTask"
-import AddTask from "./pages/AddTask"
-import Dashboard from "./pages/Dashboard"
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import { AppProvider, useAppContext } from './context/AppContext';
+import Navbar from './components/Navbar';
+import { Toaster } from 'react-hot-toast';
 
-function App() {
- return (
+const PrivateRoute = ({ children }) => {
+  const { token } = useAppContext();
+  return token ? children : <Navigate to="/login" />;
+};
+
+const App = () => {
+  return (
     <>
-      <div className="min-h-screen bg-gray-100">
-      <Navbar/>
-      <div className="p-4">
+  <Toaster position="top-center" reverseOrder={false} />
+    <Router>
+      <AppProvider>
+        <Navbar />
         <Routes>
-          <Route path="/edit-task/:id" element={<EditTask/>}/>
-          <Route path="/add-task" element={<AddTask/>}/>
-          <Route path="/" element={<Dashboard/>} />
-          <Route path="*" element={<h1 className="text-3xl font-bold text-red-600">404 - Page Not Found</h1>} />
+          <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
         </Routes>
-      </div>
-    </div>
-
+      </AppProvider>
+    </Router>
     </>
-  )
-}
+  );
+};
 
-export default App
+export default App;
